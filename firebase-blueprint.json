@@ -1,0 +1,157 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "A user of the Helala Boys app",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "The unique identifier for the user" },
+        "displayName": { "type": "string", "description": "The user's display name" },
+        "email": { "type": "string", "format": "email", "description": "The user's email address" },
+        "photoURL": { "type": "string", "format": "uri", "description": "The user's profile picture URL" },
+        "role": { "type": "string", "enum": ["admin", "user"], "description": "The user's role" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the user account was created" }
+      },
+      "required": ["uid", "email", "role"]
+    },
+    "News": {
+      "title": "News",
+      "description": "A news article for the ultras community",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "description": "The title of the news article" },
+        "content": { "type": "string", "description": "The content of the news article" },
+        "imageUrl": { "type": "string", "format": "uri", "description": "An image for the news article" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the news was posted" },
+        "authorUid": { "type": "string", "description": "The UID of the author" },
+        "likesCount": { "type": "number", "description": "The number of likes" },
+        "commentsCount": { "type": "number", "description": "The number of comments" }
+      },
+      "required": ["title", "content", "createdAt", "authorUid"]
+    },
+    "Chant": {
+      "title": "Chant",
+      "description": "An ultras chant or song",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "description": "The title of the chant" },
+        "lyrics": { "type": "string", "description": "The lyrics of the chant" },
+        "audioUrl": { "type": "string", "format": "uri", "description": "The URL to the audio file" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the chant was added" }
+      },
+      "required": ["title", "lyrics", "createdAt"]
+    },
+    "Match": {
+      "title": "Match",
+      "description": "An upcoming or past match",
+      "type": "object",
+      "properties": {
+        "opponent": { "type": "string", "description": "The name of the opponent team" },
+        "date": { "type": "string", "format": "date-time", "description": "The date and time of the match" },
+        "venue": { "type": "string", "description": "The stadium or location" },
+        "isNext": { "type": "boolean", "description": "Whether this is the upcoming match" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the match was added" }
+      },
+      "required": ["opponent", "date", "venue", "isNext", "createdAt"]
+    },
+    "FanZonePost": {
+      "title": "FanZonePost",
+      "description": "A post from a fan in the stadium",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "The UID of the fan" },
+        "userName": { "type": "string", "description": "The display name of the fan" },
+        "userPhoto": { "type": "string", "format": "uri", "description": "The profile picture of the fan" },
+        "mediaUrl": { "type": "string", "format": "uri", "description": "The URL to the photo or video" },
+        "mediaType": { "type": "string", "enum": ["image", "video"], "description": "The type of media" },
+        "caption": { "type": "string", "description": "The caption for the post" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"], "description": "The approval status" },
+        "likesCount": { "type": "number", "description": "The number of likes" },
+        "commentsCount": { "type": "number", "description": "The number of comments" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the post was created" }
+      },
+      "required": ["userId", "mediaUrl", "mediaType", "status", "createdAt"]
+    },
+    "Comment": {
+      "title": "Comment",
+      "description": "A comment on a fan zone post",
+      "type": "object",
+      "properties": {
+        "postId": { "type": "string", "description": "The ID of the post" },
+        "userId": { "type": "string", "description": "The UID of the user who commented" },
+        "userName": { "type": "string", "description": "The display name of the user" },
+        "userPhoto": { "type": "string", "format": "uri", "description": "The profile picture of the user" },
+        "text": { "type": "string", "description": "The comment text" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the comment was added" }
+      },
+      "required": ["postId", "userId", "text", "createdAt"]
+    },
+    "Like": {
+      "title": "Like",
+      "description": "A like on a fan zone post",
+      "type": "object",
+      "properties": {
+        "postId": { "type": "string", "description": "The ID of the post" },
+        "userId": { "type": "string", "description": "The UID of the user who liked" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the like was added" }
+      },
+      "required": ["postId", "userId", "createdAt"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "A notification for a user",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "description": "The title of the notification" },
+        "message": { "type": "string", "description": "The message of the notification" },
+        "type": { "type": "string", "enum": ["info", "success", "warning", "error"], "description": "The type of notification" },
+        "read": { "type": "boolean", "description": "Whether the notification has been read" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the notification was created" },
+        "link": { "type": "string", "description": "Optional link to navigate to" }
+      },
+      "required": ["title", "message", "type", "read", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles"
+    },
+    "/users/{userId}/notifications/{notificationId}": {
+      "schema": "Notification",
+      "description": "User notifications"
+    },
+    "/news/{newsId}": {
+      "schema": "News",
+      "description": "News articles"
+    },
+    "/news/{newsId}/comments/{commentId}": {
+      "schema": "Comment",
+      "description": "Comments on a news article"
+    },
+    "/news/{newsId}/likes/{userId}": {
+      "schema": "Like",
+      "description": "Likes on a news article"
+    },
+    "/chants/{chantId}": {
+      "schema": "Chant",
+      "description": "Ultras chants"
+    },
+    "/matches/{matchId}": {
+      "schema": "Match",
+      "description": "Match schedule"
+    },
+    "/fanzone/{postId}": {
+      "schema": "FanZonePost",
+      "description": "Fan zone community posts"
+    },
+    "/fanzone/{postId}/comments/{commentId}": {
+      "schema": "Comment",
+      "description": "Comments on a post"
+    },
+    "/fanzone/{postId}/likes/{userId}": {
+      "schema": "Like",
+      "description": "Likes on a post"
+    }
+  }
+}

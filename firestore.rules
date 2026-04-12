@@ -1,0 +1,247 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: {userId}
+    // Fields:
+    //   - uid: string (required)
+    //   - displayName: string
+    //   - email: string (required, email format)
+    //   - photoURL: string (url format)
+    //   - role: string (required, enum: ['admin', 'user'])
+    //   - createdAt: string (required, iso date)
+    //
+    // Collection: news
+    // Document ID: {newsId}
+    // Fields:
+    //   - title: string (required)
+    //   - content: string (required)
+    //   - imageUrl: string
+    //   - createdAt: string (required, iso date)
+    //   - authorUid: string (required)
+    //   - likesCount: number
+    //   - commentsCount: number
+    //
+    // Collection: news/{newsId}/comments
+    // Document ID: {commentId}
+    // Fields:
+    //   - postId: string (required)
+    //   - userId: string (required)
+    //   - userName: string
+    //   - userPhoto: string
+    //   - text: string (required)
+    //   - createdAt: string (required, iso date)
+    //
+    // Collection: news/{newsId}/likes
+    // Document ID: {userId}
+    // Fields:
+    //   - newsId: string (required)
+    //   - userId: string (required)
+    //   - createdAt: string (required, iso date)
+    //
+    // Collection: fanzone
+    // Document ID: {postId}
+    // Fields:
+    //   - userId: string (required)
+    //   - userName: string
+    //   - userPhoto: string
+    //   - mediaUrl: string (required)
+    //   - mediaType: string (required, enum: ['image', 'video'])
+    //   - caption: string
+    //   - status: string (required, enum: ['pending', 'approved', 'rejected'])
+    //   - likesCount: number
+    //   - commentsCount: number
+    //   - createdAt: string (required, iso date)
+    //
+    // Collection: fanzone/{postId}/comments
+    // Document ID: {commentId}
+    // Fields:
+    //   - postId: string (required)
+    //   - userId: string (required)
+    //   - userName: string
+    //   - userPhoto: string
+    //   - text: string (required)
+    //   - createdAt: string (required, iso date)
+    //
+    // Collection: fanzone/{postId}/likes
+    // Document ID: {userId}
+    // Fields:
+    //   - postId: string (required)
+    //   - userId: string (required)
+    //   - createdAt: string (required, iso date)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      let adminEmails = ["hassanaglim12@gmail.com", "hassansmk12@gmail.com"];
+      return isAuthenticated() && 
+        (request.auth.token.email in adminEmails || 
+         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'));
+    }
+
+    function isModerator() {
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'moderator';
+    }
+
+    function isStaff() {
+      return isAdmin() || isModerator();
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidUser(data, userId) {
+      return data.keys().hasAll(['uid', 'email', 'role', 'createdAt']) &&
+             data.uid == userId &&
+             isValidEmail(data.email) &&
+             data.role in ['admin', 'moderator', 'verified', 'user'] &&
+             data.uid.size() > 0 && data.uid.size() < 128;
+    }
+
+    function isValidNews(data) {
+      return data.keys().hasAll(['title', 'content', 'createdAt', 'authorUid']) &&
+             data.title is string && data.title.size() > 0 && data.title.size() < 200 &&
+             data.content is string && data.content.size() > 0 && data.content.size() < 10000 &&
+             data.authorUid is string;
+    }
+
+    function isValidChant(data) {
+      return data.keys().hasAll(['title', 'lyrics', 'createdAt']) &&
+             data.title is string && data.title.size() > 0 && data.title.size() < 200 &&
+             data.lyrics is string && data.lyrics.size() > 0 && data.lyrics.size() < 5000;
+    }
+
+    function isValidMatch(data) {
+      return data.keys().hasAll(['opponent', 'date', 'venue', 'isNext', 'createdAt']) &&
+             data.opponent is string && data.opponent.size() > 0 &&
+             data.venue is string && data.venue.size() > 0 &&
+             data.isNext is bool;
+    }
+
+    function isValidFanZonePost(data) {
+      return data.keys().hasAll(['userId', 'mediaUrl', 'mediaType', 'status', 'createdAt']) &&
+             data.userId is string &&
+             data.mediaUrl is string && data.mediaUrl.size() > 0 &&
+             data.mediaType in ['image', 'video'] &&
+             data.status in ['pending', 'approved', 'rejected'];
+    }
+
+    function isValidNotification(data) {
+      return data.keys().hasAll(['title', 'message', 'type', 'read', 'createdAt']) &&
+             data.title is string && data.title.size() > 0 && data.title.size() < 200 &&
+             data.message is string && data.message.size() > 0 && data.message.size() < 1000 &&
+             data.type in ['info', 'success', 'warning', 'error'] &&
+             data.read is bool;
+    }
+
+    function isValidComment(data, postId) {
+      return data.keys().hasAll(['postId', 'userId', 'text', 'createdAt']) &&
+             data.postId == postId &&
+             data.userId == request.auth.uid &&
+             data.text is string && data.text.size() > 0 && data.text.size() < 500;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (isOwner(userId) || isStaff());
+      allow create: if isOwner(userId) && isValidUser(request.resource.data, userId) && (request.resource.data.role == 'user' || isAdmin());
+      allow update: if (isOwner(userId) || isAdmin()) && isValidUser(request.resource.data, userId) && (request.resource.data.role == resource.data.role || isAdmin());
+      allow delete: if isAdmin();
+
+      match /notifications/{notificationId} {
+        allow read: if isOwner(userId);
+        allow create: if isStaff() && isValidNotification(request.resource.data);
+        allow update: if isOwner(userId) && 
+                         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']) &&
+                         request.resource.data.read == true;
+        allow delete: if isOwner(userId);
+      }
+    }
+
+    match /news/{newsId} {
+      allow read: if true;
+      allow create: if isStaff() && isValidNews(request.resource.data) && request.resource.data.authorUid == request.auth.uid;
+      allow update: if (isStaff() && isValidNews(request.resource.data) && request.resource.data.authorUid == resource.data.authorUid) ||
+                       (isAuthenticated() && (
+                         (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likesCount']) && 
+                          math.abs(request.resource.data.likesCount - resource.data.likesCount) == 1) ||
+                         (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['commentsCount']) && 
+                          request.resource.data.commentsCount == resource.data.commentsCount + 1)
+                       ));
+      allow delete: if isAdmin();
+
+      match /comments/{commentId} {
+        allow read: if true;
+        allow create: if isAuthenticated() && isValidComment(request.resource.data, newsId);
+        allow delete: if isStaff() || (resource.data.userId == request.auth.uid);
+      }
+
+      match /likes/{userId} {
+        allow read: if true;
+        allow create: if isAuthenticated() && userId == request.auth.uid && request.resource.data.newsId == newsId;
+        allow delete: if isAuthenticated() && userId == request.auth.uid;
+      }
+    }
+
+    match /chants/{chantId} {
+      allow read: if true;
+      allow create: if isStaff() && isValidChant(request.resource.data);
+      allow update: if isStaff() && isValidChant(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /matches/{matchId} {
+      allow read: if true;
+      allow create: if isStaff() && isValidMatch(request.resource.data);
+      allow update: if isStaff() && isValidMatch(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /fanzone/{postId} {
+      allow read: if isStaff() || (resource.data.status == 'approved') || (isAuthenticated() && resource.data.userId == request.auth.uid);
+      allow create: if isAuthenticated() && isValidFanZonePost(request.resource.data) && request.resource.data.userId == request.auth.uid && request.resource.data.status == 'pending';
+      allow update: if (isStaff() && isValidFanZonePost(request.resource.data) && request.resource.data.userId == resource.data.userId) || 
+                       (isAuthenticated() && (
+                         (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likesCount']) && 
+                          math.abs(request.resource.data.likesCount - resource.data.likesCount) == 1) ||
+                         (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['commentsCount']) && 
+                          request.resource.data.commentsCount == resource.data.commentsCount + 1)
+                       ));
+      allow delete: if isAdmin();
+
+      match /comments/{commentId} {
+        allow read: if true;
+        allow create: if isAuthenticated() && isValidComment(request.resource.data, postId);
+        allow delete: if isAdmin() || (resource.data.userId == request.auth.uid);
+      }
+
+      match /likes/{userId} {
+        allow read: if true;
+        allow create: if isAuthenticated() && userId == request.auth.uid && request.resource.data.postId == postId;
+        allow delete: if isAuthenticated() && userId == request.auth.uid;
+      }
+    }
+  }
+}
